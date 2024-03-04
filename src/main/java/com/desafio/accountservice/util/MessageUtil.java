@@ -1,6 +1,6 @@
 package com.desafio.accountservice.util;
 
-import br.com.teste.accountmanagement.config.MessageSourceConfig;
+import com.desafio.accountservice.config.MessageSourceConfig;
 import org.springframework.context.i18n.LocaleContextHolder;
 import org.springframework.stereotype.Component;
 

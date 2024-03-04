@@ -1,7 +1,7 @@
 package com.desafio.accountservice.mapper;
 
-import br.com.teste.accountmanagement.dto.request.CreateAccountRequestDTO;
-import br.com.teste.accountmanagement.model.Account;
+import com.desafio.accountservice.dto.CreateAccountRequestDTO;
+import com.desafio.accountservice.model.Account;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
 
@@ -9,5 +9,6 @@ import org.mapstruct.Mapping;
 public interface AccountRequestMapper extends EntityMapper<CreateAccountRequestDTO, Account> {
 
     @Mapping(target = "isActive", constant = "true")
+    @Mapping(target = "balance", constant = "0")
     Account toEntity(CreateAccountRequestDTO dto);
 }

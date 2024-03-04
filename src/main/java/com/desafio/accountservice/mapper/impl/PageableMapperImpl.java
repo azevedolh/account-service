@@ -1,7 +1,7 @@
 package com.desafio.accountservice.mapper.impl;
 
-import br.com.teste.accountmanagement.dto.response.PageableResponseDTO;
-import br.com.teste.accountmanagement.mapper.PageableMapper;
+import com.desafio.accountservice.dto.PageableResponseDTO;
+import com.desafio.accountservice.mapper.PageableMapper;
 import org.springframework.data.domain.Page;
 import org.springframework.stereotype.Component;
 

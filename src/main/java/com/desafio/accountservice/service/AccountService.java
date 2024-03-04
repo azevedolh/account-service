@@ -1,21 +1,22 @@
 package com.desafio.accountservice.service;
 
-import br.com.teste.accountmanagement.dto.request.CreateAccountRequestDTO;
-import br.com.teste.accountmanagement.dto.response.AccountResponseDTO;
-import br.com.teste.accountmanagement.dto.response.PageResponseDTO;
-import br.com.teste.accountmanagement.enumerator.OperationEnum;
-import br.com.teste.accountmanagement.exception.CustomBusinessException;
-import br.com.teste.accountmanagement.model.Account;
+import com.desafio.accountservice.dto.*;
+import com.desafio.accountservice.enumerator.OperationEnum;
+import com.desafio.accountservice.exception.CustomBusinessException;
+import com.desafio.accountservice.model.Account;
 
 import java.math.BigDecimal;
+import java.util.UUID;
 
 public interface AccountService {
 
-    PageResponseDTO getAccounts(Long customerId, Integer page, Integer size, String sort);
+    PageResponseDTO getAccounts(UUID customerId, Integer page, Integer size, String sort);
 
-    AccountResponseDTO create(CreateAccountRequestDTO account, Long customerId);
+    AccountResponseDTO create(CreateAccountRequestDTO account);
 
-    Account getById(Long accountId);
+    Account getById(UUID accountId);
 
-    void updateBalance(Long account, OperationEnum destination, BigDecimal amount) throws CustomBusinessException;
+    void updateBalance(UpdateBalanceRequestDTO updateBalanceRequestDTO) throws CustomBusinessException;
+
+    void transfer(TransferRequestDTO transferRequestDTO);
 }

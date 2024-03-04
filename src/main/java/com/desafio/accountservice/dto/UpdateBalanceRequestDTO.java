@@ -1,5 +1,6 @@
 package com.desafio.accountservice.dto;
 
+import com.desafio.accountservice.enumerator.OperationEnum;
 import jakarta.validation.constraints.NotNull;
 import lombok.*;
 
@@ -11,11 +12,17 @@ import java.util.UUID;
 @Builder
 @AllArgsConstructor
 @NoArgsConstructor
-public class CreateAccountRequestDTO {
+public class UpdateBalanceRequestDTO {
 
     @NotNull
-    private UUID customerId;
+    private Long account;
 
     @NotNull
     private String agency;
+
+    @NotNull
+    private BigDecimal amount;
+
+    @NotNull
+    private String operation;
 }

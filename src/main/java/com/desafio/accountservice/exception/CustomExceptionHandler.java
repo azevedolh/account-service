@@ -1,6 +1,6 @@
 package com.desafio.accountservice.exception;
 
-import br.com.teste.accountmanagement.dto.response.ApiErrorResponseDTO;
+import com.desafio.accountservice.dto.ApiErrorResponseDTO;
 import org.springframework.core.Ordered;
 import org.springframework.core.annotation.Order;
 import org.springframework.http.HttpHeaders;

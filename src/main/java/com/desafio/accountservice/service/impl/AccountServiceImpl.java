@@ -1,63 +1,59 @@
 package com.desafio.accountservice.service.impl;
 
-import br.com.teste.accountmanagement.dto.request.CreateAccountRequestDTO;
-import br.com.teste.accountmanagement.dto.response.AccountResponseDTO;
-import br.com.teste.accountmanagement.dto.response.PageResponseDTO;
-import br.com.teste.accountmanagement.enumerator.OperationEnum;
-import br.com.teste.accountmanagement.exception.CustomBusinessException;
-import br.com.teste.accountmanagement.mapper.AccountRequestMapper;
-import br.com.teste.accountmanagement.mapper.AccountResponseMapper;
-import br.com.teste.accountmanagement.mapper.PageableMapper;
-import br.com.teste.accountmanagement.model.Account;
-import br.com.teste.accountmanagement.model.Customer;
-import br.com.teste.accountmanagement.repository.AccountRepository;
-import br.com.teste.accountmanagement.service.AccountService;
-import br.com.teste.accountmanagement.service.CustomerService;
-import br.com.teste.accountmanagement.util.MessageUtil;
-import br.com.teste.accountmanagement.util.PaginationUtil;
+import com.desafio.accountservice.dto.*;
+import com.desafio.accountservice.enumerator.OperationEnum;
+import com.desafio.accountservice.exception.CustomBusinessException;
+import com.desafio.accountservice.mapper.AccountRequestMapper;
+import com.desafio.accountservice.mapper.AccountResponseMapper;
+import com.desafio.accountservice.mapper.PageableMapper;
+import com.desafio.accountservice.model.Account;
+import com.desafio.accountservice.repository.AccountRepository;
+import com.desafio.accountservice.service.AccountService;
+import com.desafio.accountservice.util.MessageUtil;
+import com.desafio.accountservice.util.PaginationUtil;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Isolation;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.util.List;
 import java.util.Optional;
+import java.util.UUID;
 
-import static br.com.teste.accountmanagement.util.ConstantUtil.SORT_BY_CREATED_AT;
+import static com.desafio.accountservice.util.ConstantUtil.SORT_BY_CREATED_AT;
+
 
 @Service
 public class AccountServiceImpl implements AccountService {
 
-    private AccountRepository accountRepository;
-    private PageableMapper pageableMapper;
-    private AccountResponseMapper accountResponseMapper;
-    private AccountRequestMapper accountRequestMapper;
-    private CustomerService customerService;
+    private final AccountRepository accountRepository;
+    private final PageableMapper pageableMapper;
+    private final AccountResponseMapper accountResponseMapper;
+    private final AccountRequestMapper accountRequestMapper;
 
     @Autowired
     public AccountServiceImpl(AccountRepository accountRepository,
                               PageableMapper pageableMapper,
                               AccountResponseMapper accountResponseMapper,
-                              AccountRequestMapper accountRequestMapper,
-                              CustomerService customerService) {
+                              AccountRequestMapper accountRequestMapper) {
         this.accountRepository = accountRepository;
         this.pageableMapper = pageableMapper;
         this.accountResponseMapper = accountResponseMapper;
         this.accountRequestMapper = accountRequestMapper;
-        this.customerService = customerService;
     }
 
     @Override
-    public PageResponseDTO getAccounts(Long customerId, Integer page, Integer size, String sort) {
-        Customer customer = customerService.getById(customerId);
-
+    public PageResponseDTO getAccounts(UUID customerId, Integer page, Integer size, String sort) {
         Sort sortProperties = PaginationUtil.getSort(sort, Sort.Direction.DESC, SORT_BY_CREATED_AT);
 
         PageRequest pageRequest = PageRequest.of(page - 1, size, sortProperties);
         PageResponseDTO pageResponseDTO = new PageResponseDTO();
-        Page<Account> accountPage = accountRepository.findAllByCustomerAndIsActive(pageRequest, customer, Boolean.TRUE);
+        Page<Account> accountPage = accountRepository.findAllByCustomerIdAndIsActive(pageRequest, customerId, Boolean.TRUE);
 
         if (accountPage != null) {
             pageResponseDTO.set_pageable(pageableMapper.toDto(accountPage));
@@ -68,20 +64,45 @@ public class AccountServiceImpl implements AccountService {
     }
 
     @Override
-    public AccountResponseDTO create(CreateAccountRequestDTO accountRequest, Long customerId) {
-        Customer customer = customerService.getById(customerId);
+    @Transactional
+    public AccountResponseDTO create(CreateAccountRequestDTO accountRequest) {
+        validateIfCustomerHasAccountWithSameAgency(
+                accountRequest.getCustomerId(),
+                accountRequest.getAgency()
+        );
+
         Account account = accountRequestMapper.toEntity(accountRequest);
-        account.setCustomer(customer);
+        account.setAccount(generateAccountNumber());
         account = accountRepository.save(account);
         return accountResponseMapper.toDto(account);
     }
 
+    private void validateIfCustomerHasAccountWithSameAgency(UUID customerId, String agency) {
+        Optional<Account> existingAccount = accountRepository.findByCustomerIdAndIsActiveAndAgency(
+                customerId,
+                Boolean.TRUE,
+                agency
+        );
+
+        if (existingAccount.isPresent()) {
+            String message = MessageUtil.getMessage("account.with.same.agency.exists", agency);
+            throw new CustomBusinessException(HttpStatus.BAD_REQUEST, message);
+        }
+    }
+
+    private Long generateAccountNumber() {
+        Optional<Long> account = accountRepository.findLastAccountAndLock();
+
+        return account.map(value -> value + 1L).orElse(1L);
+    }
+
+
     @Override
-    public Account getById(Long id) {
+    public Account getById(UUID id) {
         Optional<Account> accountOptional = accountRepository.findById(id);
 
         if (accountOptional.isEmpty()) {
-            String message = MessageUtil.getMessage("account.not.found", id.toString());
+            String message = MessageUtil.getMessage("account.not.found.by.id", id.toString());
             throw new CustomBusinessException(HttpStatus.NOT_FOUND, message);
         }
 
@@ -89,21 +110,57 @@ public class AccountServiceImpl implements AccountService {
     }
 
     @Override
-    public void updateBalance(Long accountId, OperationEnum operation, BigDecimal amount) throws CustomBusinessException {
+    @Transactional(isolation = Isolation.SERIALIZABLE)
+    public void updateBalance(UpdateBalanceRequestDTO updateBalanceRequestDTO) throws CustomBusinessException {
 
-        Account account = getById(accountId);
+        OperationEnum operationEnum = validateOperation(updateBalanceRequestDTO.getOperation());
+        validateAmount(updateBalanceRequestDTO.getAmount());
 
-        if (operation == null) {
-            String message = MessageUtil.getMessage("account.operation.not.informed");
-            throw new CustomBusinessException(message);
-        }
+        Account account = getAccountByAgencyAndAccount(
+                updateBalanceRequestDTO.getAgency(),
+                updateBalanceRequestDTO.getAccount()
+        );
 
-        if (amount == null || amount.compareTo(new BigDecimal("0")) <= 0) {
-            String message = MessageUtil.getMessage("account.amount.invalid");
-            String details = MessageUtil.getMessage("account.amount.invalid.details");
-            throw new CustomBusinessException(message, details);
-        }
+        validateAndUpdateBalance(
+                operationEnum,
+                updateBalanceRequestDTO.getAmount(),
+                account
+        );
 
+        accountRepository.save(account);
+    }
+
+    @Override
+    @Transactional(isolation = Isolation.SERIALIZABLE)
+    public void transfer(TransferRequestDTO transferRequestDTO) {
+        validateAmount(transferRequestDTO.getAmount());
+
+        Account originAccount = getAccountByAgencyAndAccount(
+                transferRequestDTO.getOriginAgency(),
+                transferRequestDTO.getOriginAccount()
+        );
+
+        Account destinationAccount = getAccountByAgencyAndAccount(
+                transferRequestDTO.getDestinationAgency(),
+                transferRequestDTO.getDestinationAccount()
+        );
+
+        validateAndUpdateBalance(
+                OperationEnum.DEBITO,
+                transferRequestDTO.getAmount(),
+                originAccount
+        );
+
+        validateAndUpdateBalance(
+                OperationEnum.CREDITO,
+                transferRequestDTO.getAmount(),
+                destinationAccount
+        );
+
+        accountRepository.saveAll(List.of(originAccount, destinationAccount));
+    }
+
+    private static void validateAndUpdateBalance(OperationEnum operation, BigDecimal amount, Account account) {
         if (OperationEnum.DEBITO == operation) {
             if (amount.compareTo(account.getBalance()) > 0) {
                 String message = MessageUtil.getMessage("account.not.enough.balance");
@@ -111,12 +168,45 @@ public class AccountServiceImpl implements AccountService {
             }
 
             account.setBalance(account.getBalance().subtract(amount));
-        } else {
-            account.setBalance(account.getBalance().add(amount));
+            return;
         }
 
-        accountRepository.save(account);
+        account.setBalance(account.getBalance().add(amount));
     }
 
+    private static void validateAmount(BigDecimal amount) {
+        if (amount == null || amount.compareTo(new BigDecimal("0")) <= 0) {
+            String message = MessageUtil.getMessage("account.amount.invalid");
+            String details = MessageUtil.getMessage("account.amount.invalid.details");
+            throw new CustomBusinessException(message, details);
+        }
+    }
 
+    private static OperationEnum validateOperation(String operation) {
+        if (operation == null) {
+            String message = MessageUtil.getMessage("account.operation.not.informed");
+            throw new CustomBusinessException(message);
+        }
+
+        if (!OperationEnum.isValid(operation)) {
+            String message = MessageUtil.getMessage("account.operation.type.details");
+            throw new CustomBusinessException(message);
+        }
+
+        return OperationEnum.valueOf(operation);
+    }
+    private Account getAccountByAgencyAndAccount(String agency, Long account) {
+        Optional<Account> accountOptional = accountRepository.findByAccountAndAgencyAndIsActive(
+                account,
+                agency,
+                Boolean.TRUE
+        );
+
+        if (accountOptional.isEmpty()) {
+            String message = MessageUtil.getMessage("account.not.found", agency, account.toString());
+            throw new CustomBusinessException(HttpStatus.NOT_FOUND, message);
+        }
+
+        return accountOptional.get();
+    }
 }

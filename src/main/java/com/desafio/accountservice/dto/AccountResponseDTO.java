@@ -4,6 +4,7 @@ import lombok.*;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.UUID;
 
 @Getter
 @Setter
@@ -11,7 +12,8 @@ import java.time.LocalDateTime;
 @NoArgsConstructor
 @AllArgsConstructor
 public class AccountResponseDTO {
-    private Long id;
+    private UUID id;
+    private Long account;
     private String agency;
     private BigDecimal balance;
     private LocalDateTime createdAt;
