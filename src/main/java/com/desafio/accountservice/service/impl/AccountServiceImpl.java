@@ -96,19 +96,6 @@ public class AccountServiceImpl implements AccountService {
         return account.map(value -> value + 1L).orElse(1L);
     }
 
-
-    @Override
-    public Account getById(UUID id) {
-        Optional<Account> accountOptional = accountRepository.findById(id);
-
-        if (accountOptional.isEmpty()) {
-            String message = MessageUtil.getMessage("account.not.found.by.id", id.toString());
-            throw new CustomBusinessException(HttpStatus.NOT_FOUND, message);
-        }
-
-        return accountOptional.get();
-    }
-
     @Override
     @Transactional(isolation = Isolation.SERIALIZABLE)
     public void updateBalance(UpdateBalanceRequestDTO updateBalanceRequestDTO) throws CustomBusinessException {
@@ -196,7 +183,7 @@ public class AccountServiceImpl implements AccountService {
         return OperationEnum.valueOf(operation);
     }
     private Account getAccountByAgencyAndAccount(String agency, Long account) {
-        Optional<Account> accountOptional = accountRepository.findByAccountAndAgencyAndIsActive(
+        Optional<Account> accountOptional = accountRepository.findAccountsByAccountAndAgencyAndLock(
                 account,
                 agency,
                 Boolean.TRUE

@@ -7,6 +7,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.util.Optional;
@@ -20,10 +21,14 @@ public interface AccountRepository extends JpaRepository<Account, UUID> {
     Optional<Account> findByCustomerIdAndIsActiveAndAgency(UUID customerId, Boolean isActive, String agency);
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
-    @Query("SELECT MAX(b.account) FROM Account b GROUP BY b.account ORDER BY b.account DESC")
-    //Optional<Account> findTopByOrderByAccountDescAndLock();
+    @Query("SELECT MAX(a.account) FROM Account a GROUP BY a.account ORDER BY a.account DESC")
     Optional<Long> findLastAccountAndLock();
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
-    Optional<Account> findByAccountAndAgencyAndIsActive(Long account, String agency, Boolean isActive);
+    @Query("SELECT a from Account a WHERE a.account = :account AND a.agency = :agency AND a.isActive = :isActive")
+    Optional<Account> findAccountsByAccountAndAgencyAndLock(
+            @Param("account") Long account,
+            @Param("agency") String agency,
+            @Param("isActive") Boolean isActive
+    );
 }

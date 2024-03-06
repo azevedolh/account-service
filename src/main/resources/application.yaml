@@ -5,9 +5,9 @@ server:
 
 spring:
   datasource:
-    url: jdbc:h2:mem:accountdb
-    username: sa
-    password:
+    url: ${DB_URL:jdbc:h2:mem:accountdb}
+    username: ${DB_USERNAME:sa}
+    password: ${DB_PASSWORD:}
     driverClassName: org.h2.Driver
   jpa:
     database-platform: org.hibernate.dialect.H2Dialect

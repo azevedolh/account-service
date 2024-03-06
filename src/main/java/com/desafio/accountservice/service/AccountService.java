@@ -14,8 +14,6 @@ public interface AccountService {
 
     AccountResponseDTO create(CreateAccountRequestDTO account);
 
-    Account getById(UUID accountId);
-
     void updateBalance(UpdateBalanceRequestDTO updateBalanceRequestDTO) throws CustomBusinessException;
 
     void transfer(TransferRequestDTO transferRequestDTO);
